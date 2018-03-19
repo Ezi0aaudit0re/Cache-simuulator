@@ -29,16 +29,20 @@ def main():
     cache = [Block(i) for i in range(CACHE_SIZE)]
 
     # initialize the memory with values
-    memory = [key % 16 for key,value in enumerate(memory) ]
+    # we modulo with 256 so that we can store 255 values in bit 0xff 0 - 255 or 1 - 256
+    memory = [key % 256 for key,value in enumerate(memory) ]
+
+
+
 
     while(True):
         ans = ask_question()
+        #ans = "w"
         # check if user wanted to read
         if(ans == "r" or ans == "read"):
             read(cache, memory)
         elif(ans == "w" or ans == "write"):
-            #Write 
-            pass
+            write(memory, cache) 
         elif(ans == "d" or ans == "display"):
             display_cache(cache)
         else:
@@ -58,6 +62,10 @@ def split(user_in):
     
 
 
+"""
+    This function reads from cache 
+    If there is a cache miss it will get data from memory 
+"""
 def read(cache, memory):
     user_in = input("What address would you like to read: ")
 
@@ -104,9 +112,15 @@ def read(cache, memory):
     :return: value / None if nothing is found
 """
 def check_in_cache(cache, tag, block_num, block_offset):
-    slot = cache[int(block_num, 16)]
-    value = slot.get_value(tag, block_offset)
-    return value
+
+    # check if the valid bit is set to 1
+    if(getattr(cache[int(block_num, 16)], "_valid_bit")):
+        # find that value at the specifed slot
+        slot = cache[int(block_num, 16)]
+        value = slot.get_value(tag, block_offset)
+        return value
+    else:
+        return None
 
 
 
@@ -123,23 +137,113 @@ def copy_from_memory_to_cache(user_in, memory, cache):
 
     block_end = block_begin + (BLOCK_SIZE - 1) # 15 more from 7a0 16 more would lead to 7b0
 
+    # get tag, block number, block offset
+    (tag, block_num, block_offset) = split(user_in)
+
+
+    # check if Dirty bit is 1 then update memory
+    if(getattr(cache[int(block_num, 16)], "_dirty_bit")):
+        update_memory(cache, memory, user_in)
+
     # get the end value of the block
     # we do (end + 1) because block goes to arr[start_included : end not_incldued]
     block_data = memory[block_begin: (block_end + 1) ] 
 
 
+    
+
     # add to the cache
-
-    # get tag, block number, block offset
-    (tag, block_num, block_offset) = split(user_in)
-
     cache[int(block_num, 16)].put_in_cache(tag, block_data)
 
 
+
+
+
+"""
+    This function updates the memory if the dirty bit / modified bit is 1
+    :param: cache -> the cache to copy from
+    :param: memory -> the main memory 
+    :address: -> str representation of the address user reqeusted that block from cache to be copied to memory 
+"""
+def update_memory(cache, memory, address, block_num):
+    # check if we have a dirty bit and the memory needs to be updated
+    begin_memory = int(address, 16)
+    begin_memory >>= 4
+    begin_memory <<= 4
+    end_memory = begin_memory + (BLOCK_SIZE - 1)
+
+
+    # get data from the cache
+    data = getattr(cache[int(block_num, 16)], "_data")
+
+    # replace the starting to the end block with new values
+    memory[begin_memory : (end_memory + 1)] = data
+
+
+
+
+
+"""
+    This function gets input from the user and writes to the cache 
+    If the address is not in cache then it will get cache from memory
+    and then write to it. 
+    Updates the Dirty Bit of that slot to 1 
+    :param: memory, cache 
+"""
+def write(memory, cache):
+    # get address from user 
+    address = input("What address would you want to write to: ")
+
+    # user can enter a hex or decimal address
+    # hex eg = 0x124
+    # decimal = 547
+    try:
+        if("0x" in address):
+            address = int(address, 16)
+        else:
+            address = int(address)
+    except Exception:
+        print("Please enter a valid address")
+        return
+
+    # check if user entered range is in memory also func takes string hex representation
+    if(user_in_check_range_in_memory(hex(address))):
+        value = input("Please enter a value(in hex) to store at this address EG 2f: ")
+        try:
+            value = int(value, 16)
+        except Exception:
+            print("Please enter a correct value")
+            return 
+
+
+        (tag, block_num, block_offset) = split(address)
+
+        # check valid bit to see if it is a cache miss or cache hit 
+        if(check_in_cache(cache, tag, block_num, block_offset)):
+            # cache hit
+            # write to cache
+            cache[int(block_num, 16)].update_address(tag, int(block_offset, 16), value)
+            print(cache[int(block_num, 16)])
+        else:
+            copy_from_memory_to_cache(address, memory, cache)
+            # chache miss
+            pass
+
+        
+
+
+
+
+
+
+"""
+    This function displays the cache
+    :param: cache
+"""
 def display_cache(cache):
-    print("SLOT \t VALID \t TAG \t DATA")
+    print("SLOT \t VALID \t TAG \t DIRTY \t DATA")
     for slot in cache:
-        print("{} \t {} \t {} \t {} \t".format(hex(getattr(slot, "_block_number")), getattr(slot, "_valid_bit"), getattr(slot, "_tag"), [value if value == None else hex(value) for value in getattr(slot, "_data")]))
+        print("{} \t {} \t {} \t {} \t {}".format(hex(getattr(slot, "_block_number")), getattr(slot, "_valid_bit"), getattr(slot, "_tag"), getattr(slot, "_dirty_bit"), [value if value == None else hex(value) for value in getattr(slot, "_data")]))
     
 
 
