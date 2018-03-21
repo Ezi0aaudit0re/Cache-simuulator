@@ -34,7 +34,6 @@ def main():
 
 
 
-
     while(True):
         ans = ask_question()
         #ans = "w"
@@ -94,13 +93,13 @@ def read(cache, memory):
         copy_from_memory_to_cache(user_in, memory, cache)
         value = check_in_cache(cache, tag, block_num, block_offset)
         if(value):
-            print("Value: {} (Cache MISS)".format(value))
+            print("At the byte the value is: {} (Cache MISS)".format(hex(value)))
         else:
             print("Something went wrong cannot copy from memory to cache")
 
     else:
         # cache hit 
-        print("Value: {} (Cache HIT)".format(value))
+        print("At the byte the value is: {} (Cache HIT)".format(hex(value)))
 
 
 """
@@ -143,7 +142,7 @@ def copy_from_memory_to_cache(user_in, memory, cache):
 
     # check if Dirty bit is 1 then update memory
     if(getattr(cache[int(block_num, 16)], "_dirty_bit")):
-        update_memory(cache, memory, user_in)
+        update_memory(cache, memory, user_in, block_num)
 
     # get the end value of the block
     # we do (end + 1) because block goes to arr[start_included : end not_incldued]
@@ -163,11 +162,12 @@ def copy_from_memory_to_cache(user_in, memory, cache):
     This function updates the memory if the dirty bit / modified bit is 1
     :param: cache -> the cache to copy from
     :param: memory -> the main memory 
-    :address: -> str representation of the address user reqeusted that block from cache to be copied to memory 
+    :address: -> int representation of the address user reqeusted that block from cache to be copied to memory 
+    :block_num: -> str representation of a hex number
 """
 def update_memory(cache, memory, address, block_num):
     # check if we have a dirty bit and the memory needs to be updated
-    begin_memory = int(address, 16)
+    begin_memory = address
     begin_memory >>= 4
     begin_memory <<= 4
     end_memory = begin_memory + (BLOCK_SIZE - 1)
@@ -192,18 +192,14 @@ def update_memory(cache, memory, address, block_num):
 """
 def write(memory, cache):
     # get address from user 
-    address = input("What address would you want to write to: ")
+    address = input("What address(in HEX) would you want to write to: ")
 
-    # user can enter a hex or decimal address
-    # hex eg = 0x124
-    # decimal = 547
+    # user can enter a hex
+    # hex eg = 24
     try:
-        if("0x" in address):
-            address = int(address, 16)
-        else:
-            address = int(address)
+        address = int(address, 16)
     except Exception:
-        print("Please enter a valid address")
+        print("Please enter a valid address in hex")
         return
 
     # check if user entered range is in memory also func takes string hex representation
@@ -223,11 +219,11 @@ def write(memory, cache):
             # cache hit
             # write to cache
             cache[int(block_num, 16)].update_address(tag, int(block_offset, 16), value)
-            print(cache[int(block_num, 16)])
+            print("The value {} has been saved to the address {} (CACHE HIT)".format(hex(value), hex(address)))
         else:
-            copy_from_memory_to_cache(address, memory, cache)
             # chache miss
-            pass
+            copy_from_memory_to_cache(address, memory, cache)
+            print("The value {} has been saved to the address {} (CACHE MISS)".format(hex(value), hex(address)))
 
         
 

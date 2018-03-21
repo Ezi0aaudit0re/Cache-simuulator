@@ -31,7 +31,6 @@ class Block:
     """
     def get_value(self, tag, offset):
         if self._valid_bit == 1 and tag == self._tag:
-           print(self._tag)
            return self._data[int(offset, 16)]
         else:
             return None
